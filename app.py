@@ -20,9 +20,9 @@ NORMAL_RANGES = {
     "diabetes": {
         "Pregnancies": "0–6",
         "Glucose": "70–99 mg/dL (fasting)",
-        "BloodPressure": "60–80 mmHg",
+        "BloodPressure": "60–90 mmHg",
         "SkinThickness": "10–50 mm",
-        "Insulin": "15–276 µU/mL",
+        "Insulin": "16-166 µU/mL",
         "BMI": "18.5–24.9",
         "DiabetesPedigreeFunction": "0.1–1.0",
         "Age": "20–60"
@@ -39,24 +39,24 @@ NORMAL_RANGES = {
         "exang": "0 = No, 1 = Yes",
         "oldpeak": "0–2 mm",
         "slope": "0–2",
-        "ca": "0–3 (vessels colored)",
+        "ca": "0–4 (vessels colored)",
         "thal": "1 = Normal, 2 = Fixed Defect, 3 = Reversible Defect"
     },
     "kidney": {
-        "age": "18–80 years",
-        "bp": "90–120 mmHg",
-        "sg": "1.005–1.030",
-        "al": "0 (normal)",
+        "age": "20–80 years",
+        "bp": "80–120 mmHg",
+        "sg": "1.010–1.025",
+        "al": "0 -1(normal)",
         "su": "0–1 (normal)",
         "bgr": "70–140 mg/dL",
         "bu": "7–20 mg/dL",
         "sc": "0.6–1.3 mg/dL",
         "sod": "135–145 mEq/L",
         "pot": "3.5–5.1 mEq/L",
-        "hemo": "13.5–17.5 g/dL (male), 12.0–15.5 g/dL (female)",
-        "pcv": "38.8–50% (male), 34.9–44.5% (female)",
-        "wc": "4500–11000 cells/cumm",
-        "rc": "4.7–6.1 million/cumm (male), 4.2–5.4 (female)"
+        "hemo": "12–16 g/dL (male), 12.0–15.5 g/dL (female)",
+        "pcv": "36–46% (male), 34.9–44.5% (female)",
+        "wc": "4000–11000 cells/cumm",
+        "rc": "4.5–5.5 million/cumm (male), 4.2–5.4 (female)"
     },
     "liver": {
         "Age": "20–80 years",
