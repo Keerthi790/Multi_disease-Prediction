@@ -1,81 +1,197 @@
-# app.py
-
 import streamlit as st
-import multi_disease_model as mdm
+import pandas as pd
+import numpy as np
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
 
-st.set_page_config(page_title="Multi Disease Prediction", layout="centered")
-st.title("🩺 Multiple Disease Prediction System")
+# Dataset file names
+DATASETS = {
+    "diabetes": ["diabetes.csv"],
+    "heart":    ["heart.csv"],
+    "kidney":   ["kidney_disease.csv", "kidney.csv"],
+    "liver":    ["Indian Liver Patient Dataset (ILPD).csv", "liver.csv"]
+}
 
-# Sidebar
-st.sidebar.title("Select Disease")
-choice = st.sidebar.radio("", [
-    "Diabetes Prediction",
-    "Heart Disease Prediction",
-    "Kidney Disease Prediction",
-    "Liver Disease Prediction"
-])
+# Actual normal ranges based on medical guidelines
+NORMAL_RANGES = {
+    "diabetes": {
+        "Pregnancies": "0–6",
+        "Glucose": "70–99 mg/dL (fasting)",
+        "BloodPressure": "60–80 mmHg",
+        "SkinThickness": "10–50 mm",
+        "Insulin": "15–276 µU/mL",
+        "BMI": "18.5–24.9",
+        "DiabetesPedigreeFunction": "0.1–1.0",
+        "Age": "20–60"
+    },
+    "heart": {
+        "age": "29–77 years",
+        "sex": "0 = Female, 1 = Male",
+        "cp": "0–3 (Chest Pain Type)",
+        "trestbps": "90–120 mmHg",
+        "chol": "125–200 mg/dL",
+        "fbs": "0 = False, 1 = True (FBS > 126 mg/dL)",
+        "restecg": "0–2 (ECG Results)",
+        "thalach": "100–200 bpm",
+        "exang": "0 = No, 1 = Yes",
+        "oldpeak": "0–2 mm",
+        "slope": "0–2",
+        "ca": "0–3 (vessels colored)",
+        "thal": "1 = Normal, 2 = Fixed Defect, 3 = Reversible Defect"
+    },
+    "kidney": {
+        "age": "18–80 years",
+        "bp": "90–120 mmHg",
+        "sg": "1.005–1.030",
+        "al": "0 (normal)",
+        "su": "0–1 (normal)",
+        "bgr": "70–140 mg/dL",
+        "bu": "7–20 mg/dL",
+        "sc": "0.6–1.3 mg/dL",
+        "sod": "135–145 mEq/L",
+        "pot": "3.5–5.1 mEq/L",
+        "hemo": "13.5–17.5 g/dL (male), 12.0–15.5 g/dL (female)",
+        "pcv": "38.8–50% (male), 34.9–44.5% (female)",
+        "wc": "4500–11000 cells/cumm",
+        "rc": "4.7–6.1 million/cumm (male), 4.2–5.4 (female)"
+    },
+    "liver": {
+        "Age": "20–80 years",
+        "Gender": "0 = Female, 1 = Male",
+        "Total_Bilirubin": "0.1–1.2 mg/dL",
+        "Direct_Bilirubin": "0–0.3 mg/dL",
+        "Alkaline_Phosphotase": "44–147 IU/L",
+        "Alamine_Aminotransferase": "7–56 IU/L",
+        "Aspartate_Aminotransferase": "10–40 IU/L",
+        "Total_Proteins": "6.0–8.3 g/dL",
+        "Albumin": "3.5–5.0 g/dL",
+        "Albumin_and_Globulin_Ratio": "1.1–2.5"
+    }
+}
 
-# Lazy‐load models once
-if 'loaded' not in st.session_state:
-    try:
-        mdm.load_and_train_all()
-        st.session_state.loaded = True
-    except FileNotFoundError as e:
-        st.sidebar.error(str(e))
-        st.stop()
+models = {}
+scalers = {}
 
-# Helper to render a form with feature ranges and display for normal and disease
-def render_form(key_name, disease_key):
-    st.header(f"{disease_key.capitalize()} Prediction")
-    info = mdm.get_feature_info(disease_key)
-    inputs = []
-    with st.form(key_name):
-        for feat, mn, mx in info:
-            st.write(f"Range for {feat}: {mn} - {mx}")
-            
-            # Display ranges for normal and disease if available
-            # You can replace the below values with those specific to each disease type.
-            if disease_key == "diabetes":
-                normal_range = f"Normal: {mn} - {mx}"  # Replace this with actual normal range values for diabetes
-                disease_range = f"Disease: {mn + 0.1} - {mx + 0.2}"  # Replace with disease-specific ranges
-            elif disease_key == "heart":
-                normal_range = f"Normal: {mn} - {mx}"  # Replace with heart disease-specific range
-                disease_range = f"Disease: {mn + 0.1} - {mx + 0.2}"
-            elif disease_key == "kidney":
-                normal_range = f"Normal: {mn} - {mx}"
-                disease_range = f"Disease: {mn + 0.1} - {mx + 0.2}"
-            elif disease_key == "liver":
-                normal_range = f"Normal: {mn} - {mx}"
-                disease_range = f"Disease: {mn + 0.1} - {mx + 0.2}"
+# Helper functions
+def locate_file(candidates):
+    for fn in candidates:
+        if os.path.exists(fn):
+            return fn
+    raise FileNotFoundError(f"None of these files found: {candidates}")
 
-            st.write(normal_range)  # Show normal range
-            st.write(disease_range)  # Show disease range
+def preprocess_data(name, df):
+    df = df.copy()
+    df.replace("?", np.nan, inplace=True)
+    df.dropna(inplace=True)
 
-            default = (mn + mx) / 2  # Default value is the middle of the range
-            val = st.number_input(
-                label=feat,
-                min_value=mn,
-                max_value=mx,
-                value=default,
-                step=(mx - mn) / 100 if mx > mn else 1.0
-            )
-            inputs.append(val)
-        
-        submit = st.form_submit_button("Predict")
-    
-    if submit:
-        pred = mdm.predict_disease(disease_key, inputs)
-        if pred == 1:
-            st.success(f"🟢 **Disease Present** for {disease_key.capitalize()}")
-        else:
-            st.success(f"🔴 **Normal** for {disease_key.capitalize()}")
+    if name == "kidney":
+        for col in df.select_dtypes(include='object').columns:
+            df[col] = df[col].str.lower()
+        if 'classification' in df.columns:
+            df['classification'] = df['classification'].map({'ckd':1, 'notckd':0})
+        df = df.select_dtypes(include=[np.number])
 
-# Dispatch
-if choice == "Diabetes Prediction":
-    render_form("form_diabetes", "diabetes")
-elif choice == "Heart Disease Prediction":
-    render_form("form_heart", "heart")
-elif choice == "Kidney Disease Prediction":
-    render_form("form_kidney", "kidney")
-elif choice == "Liver Disease Prediction":
-    render_form("form_liver", "liver")
+    elif name == "liver":
+        if 'Gender' in df.columns:
+            df['Gender'] = df['Gender'].map({'Male':1, 'Female':0})
+        if 'Dataset' in df.columns:
+            df['Dataset'] = df['Dataset'].replace({1:1, 2:0})
+
+    return df
+
+def get_target_column(name, df):
+    cands = {
+        "diabetes": [df.columns[-1]],
+        "heart":    [df.columns[-1]],
+        "kidney":   ["classification", "class", "target"],
+        "liver":    ["Dataset", "class", "target"]
+    }
+    for col in cands[name]:
+        if col in df.columns:
+            return col
+    return df.columns[-1]
+
+def train_one(name):
+    path = locate_file(DATASETS[name])
+    df = pd.read_csv(path)
+    df = preprocess_data(name, df)
+
+    target = get_target_column(name, df)
+    X = df.drop(columns=[target])
+    y = df[target]
+
+    scaler = StandardScaler()
+    Xs = scaler.fit_transform(X)
+    Xtr, Xte, ytr, yte = train_test_split(Xs, y, test_size=0.2, random_state=42)
+
+    m = RandomForestClassifier(n_estimators=100, random_state=42)
+    m.fit(Xtr, ytr)
+    acc = accuracy_score(yte, m.predict(Xte))
+    print(f"✅ {name.capitalize()} model accuracy: {acc:.2f}")
+
+    models[name] = m
+    scalers[name] = scaler
+
+def load_and_train_all():
+    for name in DATASETS:
+        train_one(name)
+
+def predict_disease(name, inputs):
+    if name not in models:
+        raise ValueError(f"Model for '{name}' not loaded")
+    m = models[name]
+    s = scalers[name]
+    return m.predict(s.transform([inputs]))[0]
+
+def get_feature_info(name):
+    path = locate_file(DATASETS[name])
+    df = pd.read_csv(path)
+    df = preprocess_data(name, df)
+    target = get_target_column(name, df)
+    X = df.drop(columns=[target])
+    return list(X.columns)
+
+# === Streamlit App ===
+
+st.set_page_config(page_title="Multi-Disease Prediction", layout="centered")
+st.title("🧠 Multi-Disease Prediction System")
+
+# Load models
+load_and_train_all()
+
+# Disease selector
+selected_disease = st.sidebar.radio(
+    "Select Disease",
+    options=["diabetes", "heart", "kidney", "liver"],
+    format_func=lambda x: x.capitalize() + " Disease Prediction"
+)
+
+st.subheader(f"📜 Enter Input for {selected_disease.capitalize()} Disease Prediction")
+
+# Get input fields
+features = get_feature_info(selected_disease)
+user_inputs = []
+
+for feature in features:
+    val = st.number_input(label=feature, value=0.0)
+    user_inputs.append(val)
+
+# Show normal ranges
+with st.expander(f"📊 Normal Ranges for {selected_disease.capitalize()} Features"):
+    if selected_disease in NORMAL_RANGES:
+        for feat in features:
+            range_text = NORMAL_RANGES[selected_disease].get(feat, "🔎 Range not specified")
+            st.markdown(f"- **{feat}**: {range_text}")
+    else:
+        st.info("Ranges not available for this disease yet.")
+
+# Prediction button
+if st.button("Predict"):
+    result = predict_disease(selected_disease, user_inputs)
+    if result == 1:
+        st.error(f"⚠️ Prediction: Positive for {selected_disease.capitalize()} Disease")
+    else:
+        st.success(f"✅ Prediction: Negative for {selected_disease.capitalize()} Disease")
