@@ -75,7 +75,6 @@ NORMAL_RANGES = {
 models = {}
 scalers = {}
 
-# Helper functions
 def locate_file(candidates):
     for fn in candidates:
         if os.path.exists(fn):
@@ -159,10 +158,8 @@ def get_feature_info(name):
 st.set_page_config(page_title="Multi-Disease Prediction", layout="centered")
 st.title("🧠 Multi-Disease Prediction System")
 
-# Load models
 load_and_train_all()
 
-# Disease selector
 selected_disease = st.sidebar.radio(
     "Select Disease",
     options=["diabetes", "heart", "kidney", "liver"],
@@ -171,7 +168,6 @@ selected_disease = st.sidebar.radio(
 
 st.subheader(f"📜 Enter Input for {selected_disease.capitalize()} Disease Prediction")
 
-# Get input fields
 features = get_feature_info(selected_disease)
 user_inputs = []
 
@@ -179,7 +175,6 @@ for feature in features:
     val = st.number_input(label=feature, value=0.0)
     user_inputs.append(val)
 
-# Show normal ranges
 with st.expander(f"📊 Normal Ranges for {selected_disease.capitalize()} Features"):
     if selected_disease in NORMAL_RANGES:
         for feat in features:
@@ -188,7 +183,6 @@ with st.expander(f"📊 Normal Ranges for {selected_disease.capitalize()} Featur
     else:
         st.info("Ranges not available for this disease yet.")
 
-# Prediction button
 if st.button("Predict"):
     result = predict_disease(selected_disease, user_inputs)
     if result == 1:
